@@ -63,27 +63,45 @@ PyTorch requirements and DirectML requirements into the same environment.
 1. Create a Roboflow account and copy your private API key.
 2. Copy `.env.example` to `.env` and set `ROBOFLOW_API_KEY`.
 3. Review the dataset terms and class names before using the data for training.
-4. Download the public project in YOLOv8 layout:
+4. Download any Roboflow Universe project in YOLOv8 layout by passing its URL:
 
 ```bash
 cp .env.example .env
 # Edit .env and set ROBOFLOW_API_KEY before continuing.
-python scripts/download_dataset.py
+python scripts/download_dataset.py \
+  --url "https://universe.roboflow.com/dtu-4hha9/wind-turbine-mpcbv/browse?queryText=&pageSize=50&startingIndex=0&browseQuery=true"
 ```
 
-The default source is the public `wind-turbine-isdhe` project from the Shanghai
-Jiao Tong University workspace, version 1. The dataset is written to
-`data/roboflow/wind-turbine-isdhe-v1/` and is excluded from Git.
+The downloader extracts `/dtu-4hha9/wind-turbine-mpcbv` from the URL and writes
+the dataset to `data/roboflow/wind-turbine-mpcbv-v1/`. URL query parameters and
+the `/browse` suffix are ignored.
 
-Override the defaults when needed:
+The original dataset can be downloaded using its own URL:
 
 ```bash
 python scripts/download_dataset.py \
-  --workspace shanghai-jiaotong-university-aru2u \
-  --project wind-turbine-isdhe \
+  --url "https://universe.roboflow.com/shanghai-jiaotong-university-aru2u/wind-turbine-isdhe"
+```
+
+Existing complete folders are skipped when `data.yaml` and non-empty train and
+valid image folders already exist. An existing incomplete folder is not overwritten
+unless `--force` is supplied:
+
+```bash
+python scripts/download_dataset.py \
+  --url "https://universe.roboflow.com/dtu-4hha9/wind-turbine-mpcbv" \
+  --force
+```
+
+Use `--output` to choose a different destination or `--version` for another
+Roboflow dataset version:
+
+```bash
+python scripts/download_dataset.py \
+  --url "https://universe.roboflow.com/dtu-4hha9/wind-turbine-mpcbv" \
   --version 1 \
   --format yolov8 \
-  --output data/roboflow/wind-turbine-isdhe-v1
+  --output data/roboflow/wind-turbine-mpcbv-v1
 ```
 
 ## Verify the Installation
