@@ -13,7 +13,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 RUN apt-get update \
-    && apt-get install --no-install-recommends -y libglib2.0-0 \
+    && apt-get install --no-install-recommends -y libglib2.0-0 libgl1 libxcb1 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements/cpu.txt requirements/base.txt requirements/web.txt ./requirements/
