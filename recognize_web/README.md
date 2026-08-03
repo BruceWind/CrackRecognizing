@@ -54,3 +54,12 @@ docker compose -f recognize_web/compose.yaml down
 
 The model is mounted from `models/` so the web UI can replace `best.pt`.
 Uploaded originals and results remain in `web_data/` on the host.
+
+## Railway
+
+On Railway, set the service's **Root Directory** to `recognize_web` so the
+Docker build context is this directory and the `Dockerfile` is auto-detected.
+The Dockerfile and its pinned requirements are self-contained here.
+
+Mount or download `models/best.pt` at `/app/models/best.pt` in the service, and
+open the generated public domain at port `3005`.

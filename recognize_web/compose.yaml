@@ -1,8 +1,8 @@
 services:
   recognize-web:
     build:
-      context: ..
-      dockerfile: recognize_web/Dockerfile
+      context: .
+      dockerfile: Dockerfile
       args:
         PYPI_MIRROR: https://pypi.tuna.tsinghua.edu.cn/simple
     ports:

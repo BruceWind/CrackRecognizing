@@ -1,0 +1,4 @@
+# WSL/Linux backend. Install this file with the PyTorch CPU index URL:
+# python -m pip install --index-url https://download.pytorch.org/whl/cpu -r requirements/cpu.txt
+torch==2.3.1
+torchvision==0.18.1

@@ -16,7 +16,7 @@ RUN apt-get update \
     && apt-get install --no-install-recommends -y libglib2.0-0 libgl1 libxcb1 \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements/cpu.txt requirements/base.txt requirements/web.txt ./requirements/
+COPY requirements/ ./requirements/
 
 # Install CPU PyTorch separately so the CUDA/WSL setup is not pulled into this image.
 RUN python -m pip install --no-cache-dir \
@@ -27,7 +27,8 @@ RUN python -m pip install --no-cache-dir \
     -r requirements/base.txt \
     -r requirements/web.txt
 
-COPY recognize_web ./recognize_web
+COPY app ./recognize_web/app
+COPY __init__.py ./recognize_web/
 
 RUN mkdir -p /app/models /app/web_data/uploads /app/web_data/results
 
