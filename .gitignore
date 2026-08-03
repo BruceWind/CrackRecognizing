@@ -1,0 +1,23 @@
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.env
+.env.*
+!.env.example
+
+# Datasets and generated model artifacts can be large.
+data/*
+!data/README.md
+runs/
+weights/
+*.pt
+*.onnx
+*.engine
+
+# Local tooling and test output
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/

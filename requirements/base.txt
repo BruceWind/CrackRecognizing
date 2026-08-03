@@ -1,0 +1,7 @@
+# Shared packages. Install one backend file first, then this file.
+roboflow==1.4.0
+ultralytics==8.4.115
+onnx==1.22.0
+onnxruntime==1.28.0
+opencv-python-headless==4.10.0.84
+python-dotenv==1.2.2

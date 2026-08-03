@@ -1,0 +1,12 @@
+[build-system]
+requires = ["setuptools>=69,<81"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "turbine-blade-inspector"
+version = "0.1.0"
+description = "Computer vision tools for wind-turbine blade damage detection"
+requires-python = ">=3.10,<3.13"
+
+[tool.setuptools.packages.find]
+where = ["src"]
