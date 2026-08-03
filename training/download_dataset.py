@@ -2,11 +2,11 @@
 
 ------------------------------------------------------------------------------------------------------------------------
 
-python scripts/download_dataset.py \
+python training/download_dataset.py \
   --url "https://universe.roboflow.com/dtu-4hha9/wind-turbine-mpcbv/browse?queryText=&pageSize=50&startingIndex=0&browseQuery=true"
 
 Force re-download:
-python scripts/download_dataset.py \
+python training/download_dataset.py \
   --url "https://universe.roboflow.com/dtu-4hha9/wind-turbine-mpcbv" \
   --force
 

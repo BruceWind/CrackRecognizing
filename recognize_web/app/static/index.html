@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Turbine Blade Inspector</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+        background: #111827;
+        color: #f3f4f6;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: radial-gradient(circle at top right, #1e3a5f, #111827 52%);
+      }
+
+      main {
+        width: min(920px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 56px 0;
+      }
+
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+      }
+
+      .eyebrow {
+        color: #60a5fa;
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        max-width: 620px;
+        margin: 12px 0;
+        font-size: clamp(2.2rem, 7vw, 4.8rem);
+        line-height: 0.98;
+      }
+
+      .intro {
+        max-width: 620px;
+        color: #cbd5e1;
+        font-size: 1.05rem;
+        line-height: 1.6;
+      }
+
+      .panel {
+        margin-top: 36px;
+        padding: 24px;
+        border: 1px solid #334155;
+        border-radius: 20px;
+        background: rgb(15 23 42 / 82%);
+        box-shadow: 0 24px 70px rgb(0 0 0 / 24%);
+      }
+
+      input[type="file"] {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 16px;
+        border: 1px dashed #64748b;
+        border-radius: 12px;
+        color: #cbd5e1;
+        background: #1e293b;
+      }
+
+      input[type="file"]:disabled {
+        cursor: not-allowed;
+        opacity: 0.45;
+      }
+
+      .model-input {
+        display: none;
+      }
+
+      .model-button {
+        display: inline-block;
+        flex: 0 0 auto;
+        padding: 10px 15px;
+        border: 1px solid #60a5fa;
+        border-radius: 999px;
+        color: #bfdbfe;
+        background: rgb(30 58 95 / 65%);
+        cursor: pointer;
+        font-size: 0.9rem;
+        font-weight: 700;
+      }
+
+      .model-button:hover {
+        background: rgb(37 99 235 / 35%);
+      }
+
+      #model-status {
+        margin: 12px 0 0;
+        color: #93c5fd;
+        font-size: 0.88rem;
+      }
+
+      #model-status.error {
+        color: #fca5a5;
+      }
+
+      #model-required {
+        display: none;
+        padding: 12px 14px;
+        border-left: 3px solid #f59e0b;
+        color: #fde68a;
+        background: rgb(120 53 15 / 25%);
+      }
+
+      button {
+        margin-top: 16px;
+        padding: 12px 18px;
+        border: 0;
+        border-radius: 999px;
+        color: #0f172a;
+        background: #60a5fa;
+        cursor: pointer;
+        font: inherit;
+        font-weight: 750;
+      }
+
+      button:disabled {
+        cursor: wait;
+        opacity: 0.55;
+      }
+
+      #status {
+        min-height: 1.5em;
+        color: #94a3b8;
+      }
+
+      #result {
+        display: none;
+        width: 100%;
+        margin-top: 20px;
+        border-radius: 12px;
+      }
+
+      .error {
+        color: #fca5a5 !important;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header class="topbar">
+        <div class="eyebrow">Wind turbine inspection</div>
+        <label class="model-button" for="model-file">
+          Upload model
+          <input id="model-file" class="model-input" type="file" accept=".pt,application/octet-stream" />
+        </label>
+      </header>
+      <h1>Find blade damage in one image.</h1>
+      <p class="intro">
+        Upload a turbine blade image. The trained YOLO model will annotate the
+        detected damage and dirt regions.
+      </p>
+      <p id="model-status" role="status">Checking model...</p>
+
+      <section class="panel">
+        <p id="model-required">Upload <code>best.pt</code> before analyzing an image.</p>
+        <form id="upload-form">
+          <input id="image" name="file" type="file" accept="image/jpeg,image/png,image/webp" required disabled />
+          <button id="submit" type="submit" disabled>Analyze image</button>
+        </form>
+        <p id="status" role="status"></p>
+        <img id="result" alt="Annotated inspection result" />
+      </section>
+    </main>
+
+    <script>
+      const form = document.querySelector("#upload-form");
+      const input = document.querySelector("#image");
+      const button = document.querySelector("#submit");
+      const status = document.querySelector("#status");
+      const result = document.querySelector("#result");
+      const modelInput = document.querySelector("#model-file");
+      const modelStatus = document.querySelector("#model-status");
+      const modelRequired = document.querySelector("#model-required");
+      let modelAvailable = false;
+      let analyzing = false;
+
+      function updateModelState(available) {
+        modelAvailable = available;
+        input.disabled = !available || analyzing;
+        button.disabled = !available || analyzing;
+        modelRequired.style.display = available ? "none" : "block";
+        modelStatus.textContent = available
+          ? "Model loaded: best.pt"
+          : "No model loaded";
+        modelStatus.classList.toggle("error", !available);
+      }
+
+      async function refreshModelState() {
+        try {
+          const response = await fetch("/status");
+          const payload = await response.json();
+          if (!response.ok) throw new Error("Could not check model status");
+          updateModelState(payload.model_available);
+        } catch (error) {
+          modelStatus.classList.add("error");
+          modelStatus.textContent = error.message;
+        }
+      }
+
+      modelInput.addEventListener("change", async () => {
+        const modelFile = modelInput.files[0];
+        if (!modelFile) return;
+
+        modelStatus.classList.remove("error");
+        modelStatus.textContent = "Loading model...";
+        const formData = new FormData();
+        formData.append("file", modelFile, "best.pt");
+
+        try {
+          const response = await fetch("/model", {
+            method: "POST",
+            body: formData,
+          });
+          const payload = await response.json();
+          if (!response.ok) throw new Error(payload.detail || "Could not load model");
+          updateModelState(payload.model_available);
+        } catch (error) {
+          modelStatus.classList.add("error");
+          modelStatus.textContent = error.message;
+        } finally {
+          modelInput.value = "";
+        }
+      });
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const imageFile = input.files[0];
+        if (!modelAvailable || !imageFile) {
+          status.classList.add("error");
+          status.textContent = "Select an image before analyzing";
+          return;
+        }
+
+        analyzing = true;
+        updateModelState(modelAvailable);
+        button.disabled = true;
+        result.style.display = "none";
+        status.classList.remove("error");
+        status.textContent = "Analyzing image...";
+
+        try {
+          const formData = new FormData();
+          formData.append("file", imageFile, imageFile.name);
+          const response = await fetch("/predict", {
+            method: "POST",
+            body: formData,
+          });
+          const payload = await response.json();
+          if (!response.ok) throw new Error(payload.detail || "Inference failed");
+
+          result.src = `${payload.image_url}?cache=${Date.now()}`;
+          result.style.display = "block";
+          status.textContent = "Annotated result";
+        } catch (error) {
+          status.classList.add("error");
+          status.textContent = error.message;
+        } finally {
+          analyzing = false;
+          updateModelState(modelAvailable);
+        }
+      });
+
+      refreshModelState();
+    </script>
+  </body>
+</html>

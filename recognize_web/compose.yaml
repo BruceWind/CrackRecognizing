@@ -1,0 +1,19 @@
+services:
+  recognize-web:
+    build:
+      context: ..
+      dockerfile: recognize_web/Dockerfile
+      args:
+        PYPI_MIRROR: https://pypi.tuna.tsinghua.edu.cn/simple
+    ports:
+      - "3005:3005"
+    environment:
+      MODEL_PATH: /app/models/best.pt
+      UPLOAD_DIR: /app/web_data/uploads
+      RESULT_DIR: /app/web_data/results
+      YOLO_DEVICE: cpu
+      PORT: 3005
+    volumes:
+      - ../models:/app/models
+      - ../web_data:/app/web_data
+    restart: unless-stopped

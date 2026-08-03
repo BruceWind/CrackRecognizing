@@ -1,13 +1,13 @@
 # AutoDL Guide
 
 This guide runs the turbine-blade detector on an AutoDL NVIDIA GPU without
-using the custom `scripts/train.py` file. It uses the Ultralytics `yolo` command
+using the custom `training/train.py` file. It uses the Ultralytics `yolo` command
 directly.
 
 The commands assume that the repository is available at:
 
 ```text
-/root/autodl-tmp/turbine-blade-inspector
+/root/autodl-tmp/CrackRecognizing
 ```
 
 Change `PROJECT_DIR` below if the repository is in another directory.
@@ -19,10 +19,10 @@ Choose an AutoDL image with:
 - An NVIDIA CUDA-enabled PyTorch environment
 - Python 3.10 or 3.11
 - CUDA 12.1 or newer
-- An RTX 4090D 24G or another supported NVIDIA GPU
+- An RTX 4090 or RTX 4090D 24G, or another supported NVIDIA GPU
 
 The exact PyTorch version is not important as long as it is a CUDA build. Do
-not choose a CPU-only image. The RTX 4090D does not require a special training
+not choose a CPU-only image. The RTX 4090 and 4090D do not require special training
 command.
 
 ## 2. Copy The Repository
@@ -31,19 +31,20 @@ Copy the repository to AutoDL's persistent data disk, or clone it if it is
 available from Git:
 
 ```bash
-source /etc/network_turbo 
+source /etc/network_turbo
 cd /root/autodl-tmp
-git clone <repository-url> turbine-blade-inspector
-cd /root/autodl-tmp/turbine-blade-inspector
+git clone <repository-url> CrackRecognizing
+cd /root/autodl-tmp/CrackRecognizing
 ```
 
 If the repository was uploaded as an archive, extract it and make sure the
-resulting directory contains `requirements/`, `scripts/`, and `pyproject.toml`.
+resulting directory contains `requirements/`, `training/`, `recognize_web/`, and
+`pyproject.toml`.
 
 Set the project directory for the remaining commands:
 
 ```bash
-export PROJECT_DIR=/root/autodl-tmp/turbine-blade-inspector
+export PROJECT_DIR=/root/autodl-tmp/CrackRecognizing
 cd "$PROJECT_DIR"
 ```
 
@@ -96,7 +97,7 @@ file this way:
 
 ```bash
 export ROBOFLOW_API_KEY='paste-your-roboflow-api-key-here'
-python scripts/download_dataset.py \
+python training/download_dataset.py \
   --url "https://universe.roboflow.com/dtu-4hha9/wind-turbine-mpcbv" \
   --version 1 \
   --format yolov8 \
@@ -134,7 +135,7 @@ yolo detect train \
 ```
 
 `yolov8n.pt` is downloaded automatically the first time. The `n` model is a
-good starting point for this two-class dataset. The 4090D 24G should normally
+good starting point for this two-class dataset. A 4090/4090D 24G should normally
 handle this command; reduce `batch` to `8` or `4` if CUDA runs out of memory.
 
 Important options:
@@ -157,6 +158,58 @@ The trained checkpoints are in its `weights/` directory:
 runs/detect/wind-turbine-mpcbv-v1/weights/best.pt
 runs/detect/wind-turbine-mpcbv-v1/weights/last.pt
 ```
+
+## 6.1 Run Training In Background
+Run training in the foreground:
+cd /root/autodl-tmp/CrackRecognizing
+
+yolo detect train \
+  data=data/roboflow/wind-turbine-mpcbv-v1/data.yaml \
+  model=yolov8n.pt \
+  epochs=100 \
+  imgsz=640 \
+  batch=16 \
+  device=0
+You will see epoch progress, GPU memory, losses, precision, recall, and mAP in the terminal.
+
+### RUnning in background
+Use tmux so training continues after disconnecting:
+```
+tmux new -s yolo-training
+```
+Run the training command, then detach with:
+Ctrl+B, then D
+
+Reconnect later:
+`tmux attach -t yolo-training`
+
+Check Process and GPU
+`nvidia-smi`
+You can also check the process:
+`ps aux | grep '[y]olo'`
+## Training Outputs
+Ultralytics usually saves results under:
+```
+runs/detect/train/
+Important files:
+runs/detect/train/weights/best.pt
+runs/detect/train/weights/last.pt
+runs/detect/train/results.csv
+runs/detect/train/results.png
+- best.pt: best model based on validation performance
+- last.pt: checkpoint from the latest epoch, useful for resuming
+- results.csv: metrics for every epoch
+- results.png: training curves
+```
+The exact output directory is printed when training starts.
+Use the trained model like this:
+yolo detect predict \
+  model=runs/detect/train/weights/best.pt \
+  source=data/roboflow/wind-turbine-mpcbv-v1/test/images \
+  device=0
+The .pt file is the trained YOLO model.
+
+
 
 ## 7. Resume Training
 
@@ -190,21 +243,31 @@ yolo detect predict \
   save=True
 ```
 
-## 9. AutoDL Start Command
+## 9. Download The Trained Model
 
-After dependencies have been installed once, use this as the AutoDL start
-command for a new training run:
-
-```bash
-cd /root/autodl-tmp/turbine-blade-inspector && yolo detect train data=data/roboflow/wind-turbine-mpcbv-v1/data.yaml model=yolov8n.pt epochs=100 imgsz=640 batch=16 workers=8 device=0 project=runs/detect name=wind-turbine-mpcbv-v1
-```
-
-If the environment is recreated each time, use this setup-and-train command
-instead:
+If you only need the model for inference, archive `best.pt`:
 
 ```bash
-cd /root/autodl-tmp/turbine-blade-inspector && python -m pip install -r requirements/base.txt --index-url https://pypi.tuna.tsinghua.edu.cn/simple && yolo detect train data=data/roboflow/wind-turbine-mpcbv-v1/data.yaml model=yolov8n.pt epochs=100 imgsz=640 batch=16 workers=8 device=0 project=runs/detect name=wind-turbine-mpcbv-v1
+cd /root/autodl-tmp/CrackRecognizing
+zip wind-turbine-mpcbv-v1-best.zip \
+  runs/detect/wind-turbine-mpcbv-v1/weights/best.pt
 ```
 
-Keep the repository and `runs/` directory on AutoDL's persistent data disk so
-that checkpoints survive instance restarts.
+To keep the model, metrics, plots, and resume checkpoint, archive the complete
+training run instead:
+
+```bash
+cd /root/autodl-tmp/CrackRecognizing
+zip -r wind-turbine-mpcbv-v1-training.zip \
+  runs/detect/train
+```
+
+Run this `scp` command on your local computer to download the complete archive:
+
+```bash
+scp -P 11273 \
+  root@connect.bjb2.seetacloud.com:/root/autodl-tmp/CrackRecognizing/wind-turbine-mpcbv-v1-training.zip .
+```
+
+Replace `wind-turbine-mpcbv-v1-training.zip` with
+`wind-turbine-mpcbv-v1-best.zip` when downloading only the trained model.

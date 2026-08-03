@@ -14,9 +14,11 @@ inference will be added after the dataset classes and annotations have been revi
 │   ├── base.txt                  # Shared Python packages
 │   ├── cpu.txt                   # PyTorch CPU wheels for WSL/Linux
 │   └── directml.txt              # Native Windows DirectML alternative
-├── scripts/
-│   └── download_dataset.py       # Roboflow dataset bootstrap
-├── AUTODL.md                     # AutoDL setup and CLI training guide
+├── training/
+│   ├── AUTODL.md                 # AutoDL setup and CLI training guide
+│   ├── download_dataset.py       # Roboflow dataset bootstrap
+│   └── train.py                  # Python training entry point
+├── recognize_web/                # Local single-image inference web app
 └── src/turbine_blade_inspector/
 ```
 
@@ -69,7 +71,7 @@ PyTorch requirements and DirectML requirements into the same environment.
 ```bash
 cp .env.example .env
 # Edit .env and set ROBOFLOW_API_KEY before continuing.
-python scripts/download_dataset.py \
+python training/download_dataset.py \
   --url "https://universe.roboflow.com/dtu-4hha9/wind-turbine-mpcbv/browse?queryText=&pageSize=50&startingIndex=0&browseQuery=true"
 ```
 
@@ -80,7 +82,7 @@ the `/browse` suffix are ignored.
 The original dataset can be downloaded using its own URL:
 
 ```bash
-python scripts/download_dataset.py \
+python training/download_dataset.py \
   --url "https://universe.roboflow.com/shanghai-jiaotong-university-aru2u/wind-turbine-isdhe"
 ```
 
@@ -89,7 +91,7 @@ valid image folders already exist. An existing incomplete folder is not overwrit
 unless `--force` is supplied:
 
 ```bash
-python scripts/download_dataset.py \
+python training/download_dataset.py \
   --url "https://universe.roboflow.com/dtu-4hha9/wind-turbine-mpcbv" \
   --force
 ```
@@ -98,7 +100,7 @@ Use `--output` to choose a different destination or `--version` for another
 Roboflow dataset version:
 
 ```bash
-python scripts/download_dataset.py \
+python training/download_dataset.py \
   --url "https://universe.roboflow.com/dtu-4hha9/wind-turbine-mpcbv" \
   --version 1 \
   --format yolov8 \
@@ -110,13 +112,13 @@ python scripts/download_dataset.py \
 ```bash
 python -c "import torch; print('PyTorch:', torch.__version__, 'CUDA:', torch.cuda.is_available())"
 python -c "import onnxruntime; print('ONNX Runtime:', onnxruntime.__version__)"
-python scripts/download_dataset.py --help
+python training/download_dataset.py --help
 ```
 
 ## Train YOLO on AutoDL
 
 For a complete AutoDL workflow using the `yolo` command directly, without the
-custom training Python file, see [AUTODL.md](AUTODL.md).
+custom training Python file, see [training/AUTODL.md](training/AUTODL.md).
 
 Install the project dependencies in the AutoDL environment first. For a CUDA
 environment, install a compatible PyTorch build, then install the shared packages:
@@ -128,7 +130,7 @@ python -m pip install -r requirements/base.txt
 Start a YOLOv8-nano training run on GPU 0:
 
 ```bash
-python scripts/train.py \
+python training/train.py \
   --model yolov8n.pt \
   --epochs 100 \
   --batch 16 \
@@ -144,11 +146,49 @@ subdirectory. Reduce `--batch` if CUDA runs out of memory. Larger models such as
 To continue an interrupted run, pass its checkpoint as `--model` and add `--resume`:
 
 ```bash
-python scripts/train.py \
+python training/train.py \
   --model runs/detect/wind-turbine-mpcbv-v1/weights/last.pt \
   --resume \
   --device 0
 ```
+
+## Local WSL Web App
+
+The project includes a small FastAPI web interface for single-image CPU
+inference. It keeps uploaded originals in `web_data/uploads/` and annotated
+results in `web_data/results/`. Copy the trained checkpoint to `models/best.pt`
+or upload it through the web page, then run:
+
+```bash
+./recognize_web/setup.sh
+./recognize_web/start.sh
+```
+
+Open [http://localhost:8000](http://localhost:8000) in a Windows browser. The
+WSL setup uses CPU PyTorch, which is appropriate for the AMD 7735HS integrated
+GPU environment. To use another checkpoint location:
+
+```bash
+MODEL_PATH=/path/to/best.pt ./recognize_web/start.sh
+```
+
+The web service does not expose detection metadata in the UI; it displays the
+annotated image returned by YOLO. See [recognize_web/README.md](recognize_web/README.md)
+for web-specific setup and usage details.
+
+To run the web app in Docker instead of the WSL virtual environment:
+
+```bash
+mkdir -p models web_data
+cp /path/to/best.pt models/best.pt
+docker compose -f recognize_web/compose.yaml up --build
+```
+
+The Docker deployment is available at [http://localhost:3005](http://localhost:3005).
+
+The container uses CPU inference and keeps the model and retained images on the
+host through volume mounts. See [recognize_web/README.md](recognize_web/README.md)
+for Docker details.
 
 ## Next Steps
 

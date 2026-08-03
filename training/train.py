@@ -1,7 +1,7 @@
 """Train a YOLOv8 detector on the turbine blade dataset.
 
 Example:
-    python scripts/train.py --epochs 100 --batch 16 --device 0
+    python training/train.py --epochs 100 --batch 16 --device 0
 
 For an RTX 4090D, choose:
 - PyTorch: 2.3.1 or newer

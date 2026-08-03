@@ -1,0 +1,13 @@
+.git/
+.venv/
+__pycache__/
+*.py[cod]
+.env
+.env.*
+data/
+runs/
+models/
+web_data/
+*.pt
+*.onnx
+*.engine
