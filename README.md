@@ -16,6 +16,7 @@ inference will be added after the dataset classes and annotations have been revi
 │   └── directml.txt              # Native Windows DirectML alternative
 ├── scripts/
 │   └── download_dataset.py       # Roboflow dataset bootstrap
+├── AUTODL.md                     # AutoDL setup and CLI training guide
 └── src/turbine_blade_inspector/
 ```
 
@@ -110,6 +111,43 @@ python scripts/download_dataset.py \
 python -c "import torch; print('PyTorch:', torch.__version__, 'CUDA:', torch.cuda.is_available())"
 python -c "import onnxruntime; print('ONNX Runtime:', onnxruntime.__version__)"
 python scripts/download_dataset.py --help
+```
+
+## Train YOLO on AutoDL
+
+For a complete AutoDL workflow using the `yolo` command directly, without the
+custom training Python file, see [AUTODL.md](AUTODL.md).
+
+Install the project dependencies in the AutoDL environment first. For a CUDA
+environment, install a compatible PyTorch build, then install the shared packages:
+
+```bash
+python -m pip install -r requirements/base.txt
+```
+
+Start a YOLOv8-nano training run on GPU 0:
+
+```bash
+python scripts/train.py \
+  --model yolov8n.pt \
+  --epochs 100 \
+  --batch 16 \
+  --device 0
+```
+
+The pretrained `yolov8n.pt` checkpoint is downloaded automatically if it is not
+already present. Results and the best checkpoint are written under
+`runs/detect/wind-turbine-mpcbv-v1/`, with the trained weights in its `weights/`
+subdirectory. Reduce `--batch` if CUDA runs out of memory. Larger models such as
+`yolov8s.pt` can be selected with `--model` after confirming the GPU has enough memory.
+
+To continue an interrupted run, pass its checkpoint as `--model` and add `--resume`:
+
+```bash
+python scripts/train.py \
+  --model runs/detect/wind-turbine-mpcbv-v1/weights/last.pt \
+  --resume \
+  --device 0
 ```
 
 ## Next Steps
