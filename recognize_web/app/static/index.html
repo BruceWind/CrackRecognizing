@@ -145,6 +145,46 @@
         border-radius: 12px;
       }
 
+      #details {
+        display: none;
+        margin-top: 20px;
+        padding-top: 20px;
+        border-top: 1px solid #334155;
+      }
+
+      .summary {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin: 0 0 16px;
+        color: #cbd5e1;
+      }
+
+      .summary span {
+        padding: 8px 12px;
+        border-radius: 8px;
+        background: #1e293b;
+      }
+
+      #detections {
+        width: 100%;
+        border-collapse: collapse;
+        color: #cbd5e1;
+        font-size: 0.9rem;
+      }
+
+      #detections th,
+      #detections td {
+        padding: 9px 8px;
+        border-bottom: 1px solid #334155;
+        text-align: left;
+      }
+
+      #detections th {
+        color: #93c5fd;
+        font-weight: 700;
+      }
+
       .error {
         color: #fca5a5 !important;
       }
@@ -174,6 +214,15 @@
         </form>
         <p id="status" role="status"></p>
         <img id="result" alt="Annotated inspection result" />
+        <section id="details" aria-live="polite">
+          <div id="summary" class="summary"></div>
+          <table id="detections">
+            <thead>
+              <tr><th>Class</th><th>Confidence</th><th>Bounding box</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </section>
       </section>
     </main>
 
@@ -183,11 +232,47 @@
       const button = document.querySelector("#submit");
       const status = document.querySelector("#status");
       const result = document.querySelector("#result");
+      const details = document.querySelector("#details");
+      const summary = document.querySelector("#summary");
+      const detectionsBody = document.querySelector("#detections tbody");
       const modelInput = document.querySelector("#model-file");
       const modelStatus = document.querySelector("#model-status");
       const modelRequired = document.querySelector("#model-required");
       let modelAvailable = false;
       let analyzing = false;
+
+      function showPredictionDetails(payload) {
+        const image = payload.image;
+        const classes = Object.entries(payload.detections_by_class || {})
+          .map(([name, count]) => `${name}: ${count}`)
+          .join(", ") || "None";
+        summary.replaceChildren();
+        for (const text of [
+          `Detections: ${payload.detection_count}`,
+          `Image: ${image.width} x ${image.height}`,
+          `Time: ${payload.inference_time_ms} ms`,
+          `Classes: ${classes}`,
+        ]) {
+          const item = document.createElement("span");
+          item.textContent = text;
+          summary.append(item);
+        }
+        detectionsBody.replaceChildren();
+        for (const detection of payload.detections) {
+          const row = document.createElement("tr");
+          const box = detection.box;
+          row.append(
+            document.createElement("td"),
+            document.createElement("td"),
+            document.createElement("td"),
+          );
+          row.cells[0].textContent = detection.class_name;
+          row.cells[1].textContent = `${(detection.confidence * 100).toFixed(1)}%`;
+          row.cells[2].textContent = `[${box.x1}, ${box.y1}, ${box.x2}, ${box.y2}]`;
+          detectionsBody.append(row);
+        }
+        details.style.display = "block";
+      }
 
       function updateModelState(available) {
         modelAvailable = available;
@@ -265,6 +350,7 @@
 
           result.src = `${payload.image_url}?cache=${Date.now()}`;
           result.style.display = "block";
+          showPredictionDetails(payload);
           status.textContent = "Annotated result";
         } catch (error) {
           status.classList.add("error");

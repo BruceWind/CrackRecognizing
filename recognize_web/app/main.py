@@ -6,6 +6,7 @@ import os
 import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Any
 from uuid import uuid4
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
@@ -101,7 +102,7 @@ async def upload_model(file: UploadFile = File(...)) -> dict[str, bool]:
     return {"model_available": True}
 
 
-def run_prediction(input_path: Path, output_path: Path) -> None:
+def run_prediction(input_path: Path, output_path: Path) -> dict[str, Any]:
     import cv2
 
     with MODEL_LOCK:
@@ -115,12 +116,54 @@ def run_prediction(input_path: Path, output_path: Path) -> None:
         )[0]
         annotated_image = result.plot()
 
+        detections = []
+        if result.boxes is not None:
+            boxes = result.boxes.xyxy.cpu().tolist()
+            confidences = result.boxes.conf.cpu().tolist()
+            class_ids = result.boxes.cls.cpu().tolist()
+            for box, confidence, class_id in zip(boxes, confidences, class_ids):
+                class_id = int(class_id)
+                detections.append(
+                    {
+                        "class_id": class_id,
+                        "class_name": result.names.get(class_id, str(class_id)),
+                        "confidence": round(float(confidence), 4),
+                        "box": {
+                            "x1": round(float(box[0]), 2),
+                            "y1": round(float(box[1]), 2),
+                            "x2": round(float(box[2]), 2),
+                            "y2": round(float(box[3]), 2),
+                        },
+                    }
+                )
+
     if not cv2.imwrite(str(output_path), annotated_image):
         raise RuntimeError(f"Could not write annotated image to {output_path}")
 
+    detections_by_class: dict[str, int] = {}
+    for detection in detections:
+        class_name = detection["class_name"]
+        detections_by_class[class_name] = detections_by_class.get(class_name, 0) + 1
+
+    return {
+        "detections": detections,
+        "detection_count": len(detections),
+        "detections_by_class": detections_by_class,
+        "image": {
+            "width": int(result.orig_shape[1]),
+            "height": int(result.orig_shape[0]),
+        },
+        "inference_time_ms": round(
+            sum(float(value) for value in result.speed.values()), 2
+        ),
+        "inference_speed_ms": {
+            key: round(float(value), 2) for key, value in result.speed.items()
+        },
+    }
+
 
 @app.post("/predict")
-async def predict(file: UploadFile | None = File(None)) -> dict[str, str]:
+async def predict(file: UploadFile | None = File(None)) -> dict[str, Any]:
     with MODEL_LOCK:
         if app.state.model is None:
             raise HTTPException(status_code=503, detail="Upload best.pt before analyzing images")
@@ -151,7 +194,7 @@ async def predict(file: UploadFile | None = File(None)) -> dict[str, str]:
     input_path.write_bytes(image_bytes)
 
     try:
-        await run_in_threadpool(
+        prediction = await run_in_threadpool(
             run_prediction,
             input_path,
             output_path,
@@ -159,4 +202,8 @@ async def predict(file: UploadFile | None = File(None)) -> dict[str, str]:
     except Exception as error:
         raise HTTPException(status_code=500, detail="Inference failed") from error
 
-    return {"image_url": f"/results/{output_path.name}"}
+    return {
+        "image_url": f"/results/{output_path.name}",
+        "filename": file.filename,
+        **prediction,
+    }

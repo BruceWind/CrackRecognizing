@@ -55,6 +55,30 @@ docker compose -f recognize_web/compose.yaml down
 The model is mounted from `models/` so the web UI can replace `best.pt`.
 Uploaded originals and results remain in `web_data/` on the host.
 
+## Prediction response
+
+`POST /predict` returns the annotated image URL plus prediction details:
+
+```json
+{
+  "image_url": "/results/<id>.jpg",
+  "filename": "blade.jpg",
+  "detection_count": 1,
+  "detections_by_class": {"damage": 1},
+  "detections": [
+    {
+      "class_id": 0,
+      "class_name": "damage",
+      "confidence": 0.9732,
+      "box": {"x1": 120.5, "y1": 80.0, "x2": 310.25, "y2": 240.75}
+    }
+  ],
+  "image": {"width": 1280, "height": 720},
+  "inference_time_ms": 42.1,
+  "inference_speed_ms": {"preprocess": 3.2, "inference": 35.4, "postprocess": 3.5}
+}
+```
+
 ## Railway
 
 On Railway, set the service's **Root Directory** to `recognize_web` so the
